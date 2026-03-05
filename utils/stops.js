@@ -25,19 +25,35 @@ export function fuzzyMatchStops(query, names) {
 
 export function extractStops(text) {
   const lower = text.toLowerCase();
-  const airportMatch = text.match(/\b(airport)\b/i);
-  const isAirport = !!airportMatch;
-  const airportIndex = airportMatch ? airportMatch.index : -1;
+  
+  // Remove day references and time patterns from text for stop matching
+  const dayWords = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'tomorrow', 'today'];
+  let cleanText = text;
+  for (const day of dayWords) {
+    cleanText = cleanText.replace(new RegExp(`\\b${day}\\b`, 'gi'), '');
+  }
+  // Remove time patterns like "at 8pm", "8:00", etc.
+  cleanText = cleanText.replace(/\bat\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b/gi, '');
+  cleanText = cleanText.replace(/\b\d{1,2}:\d{2}\b/g, '');
+  cleanText = cleanText.replace(/\b\d{1,2}\s*(am|pm)\b/gi, '');
+  cleanText = cleanText.replace(/\s+/g, ' ').trim();
+  
+  console.log('Clean text:', cleanText);
   
   let originCandidates = [];
   let destCandidates = [];
   let isAirportDestination = false;
   
-  const fromMatch = text.match(/\bfrom\s+([A-Za-z0-9''\s]+?)(?:\s+(?:for|at|to|by|before|on)\b|$)/i);
-  const toMatch = text.match(/\bto\s+(?:the\s+)?([A-Za-z0-9''\s]+?)(?:\s+(?:from|for|at|by|before|on)\b|$)/i);
+  // Look for explicit "from X to Y" pattern
+  const fromMatch = cleanText.match(/\bfrom\s+([A-Za-z0-9''\s]+?)(?:\s+to\b|\s*$)/i);
+  const toMatch = cleanText.match(/\bto\s+(?:the\s+)?([A-Za-z0-9''\s]+?)(?:\s+from\b|\s*$)/i);
+  
+  console.log('fromMatch:', fromMatch);
+  console.log('toMatch:', toMatch);
   
   if (fromMatch) {
     const fromStop = fromMatch[1].trim().toLowerCase();
+    console.log('fromStop:', fromStop);
     if (fromStop.includes('airport')) {
       originCandidates = allStopNames.filter(s => s.toLowerCase().includes('airport'));
     } else {
@@ -47,45 +63,62 @@ export function extractStops(text) {
   
   if (toMatch) {
     const toStop = toMatch[1].trim().toLowerCase();
+    console.log('toStop:', toStop);
     if (toStop.includes('airport')) {
       destCandidates = allStopNames.filter(s => s.toLowerCase().includes('airport'));
       isAirportDestination = true;
-    } else if (!isAirport) {
+    } else {
       destCandidates = fuzzyMatchStops(toMatch[1].trim(), allStopNames);
     }
   }
   
+  // If no explicit from/to, look for "X to Y" pattern
   if (!originCandidates.length || !destCandidates.length) {
-    const prefixless = text.match(/^([A-Za-z0-9''\s]+?)\s+to\s+(?:the\s+)?([A-Za-z0-9''\s]+?)(?:\s+(?:for|at|by|before|on)\b|\s+\d|$)/i);
-    if (prefixless) {
-      const left = prefixless[1].trim().toLowerCase();
-      const right = prefixless[2].trim().toLowerCase();
+    const toIndex = cleanText.toLowerCase().indexOf(' to ');
+    console.log('toIndex:', toIndex);
+    if (toIndex !== -1) {
+      // Split on " to "
+      const beforeTo = cleanText.substring(0, toIndex).trim();
+      const afterTo = cleanText.substring(toIndex + 4).trim();
       
-      if (left.includes('airport')) {
-        originCandidates = allStopNames.filter(s => s.toLowerCase().includes('airport'));
-      } else {
-        const leftMatches = fuzzyMatchStops(prefixless[1].trim(), allStopNames);
-        if (!originCandidates.length && leftMatches.length) originCandidates = leftMatches;
+      console.log('beforeTo:', beforeTo);
+      console.log('afterTo:', afterTo);
+      
+      if (!originCandidates.length && beforeTo) {
+        if (beforeTo.toLowerCase().includes('airport')) {
+          originCandidates = allStopNames.filter(s => s.toLowerCase().includes('airport'));
+        } else {
+          const matches = fuzzyMatchStops(beforeTo, allStopNames);
+          if (matches.length) originCandidates = matches;
+        }
       }
       
-      if (right.includes('airport')) {
-        destCandidates = allStopNames.filter(s => s.toLowerCase().includes('airport'));
-        isAirportDestination = true;
-      } else if (!isAirport || airportIndex === -1 || airportIndex > text.toLowerCase().indexOf('to')) {
-        const rightMatches = fuzzyMatchStops(prefixless[2].trim(), allStopNames);
-        if (!destCandidates.length && rightMatches.length) destCandidates = rightMatches;
-      }
-    }
-    
-    if (isAirport && !originCandidates.length && !destCandidates.length) {
-      const flightPattern = text.match(/^([A-Za-z0-9''\s]+?)(?:\s+(?:flight|fly|at|for)\b|\s+\d)/i);
-      if (flightPattern) {
-        const origin = fuzzyMatchStops(flightPattern[1].trim(), allStopNames);
-        if (origin.length) {
-          originCandidates = origin;
+      if (!destCandidates.length && afterTo) {
+        if (afterTo.toLowerCase().includes('airport')) {
           destCandidates = allStopNames.filter(s => s.toLowerCase().includes('airport'));
           isAirportDestination = true;
+          console.log('Set isAirportDestination = true');
+        } else {
+          const matches = fuzzyMatchStops(afterTo, allStopNames);
+          if (matches.length) destCandidates = matches;
         }
+      }
+    }
+  }
+  
+  console.log('origin:', originCandidates[0]);
+  console.log('destination:', destCandidates[0]);
+  console.log('isAirportDestination:', isAirportDestination);
+  
+  // Handle flight/airport queries without explicit "to" (e.g., "Town flight 5pm")
+  if (!originCandidates.length && !destCandidates.length) {
+    const flightPattern = cleanText.match(/^([A-Za-z0-9''\s]+?)(?:\s+(?:flight|fly)\b)/i);
+    if (flightPattern) {
+      const origin = fuzzyMatchStops(flightPattern[1].trim(), allStopNames);
+      if (origin.length) {
+        originCandidates = origin;
+        destCandidates = allStopNames.filter(s => s.toLowerCase().includes('airport'));
+        isAirportDestination = true;
       }
     }
   }

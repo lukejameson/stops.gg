@@ -1,13 +1,24 @@
 import { minsToTime, durStr } from '../utils/time.js';
 
 const DAYS = ['sun','mon','tue','wed','thu','fri','sat'];
+const DAY_NAMES = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
 
-function renderDays(serviceDays) {
-  const today = new Date().getDay();
+function renderDays(serviceDays, selectedDay = null) {
+  // Convert selectedDay name to index (0-6)
+  let selectedIndex = -1;
+  if (selectedDay) {
+    selectedIndex = DAY_NAMES.indexOf(selectedDay.toLowerCase());
+  }
+  
+  // If no selected day, use today
+  if (selectedIndex === -1) {
+    selectedIndex = new Date().getDay();
+  }
+  
   return DAYS.map((d, i) => {
-    const on = serviceDays[['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][i]];
-    const isToday = i === today;
-    return `<div class="day ${on ? 'on' : ''} ${isToday ? 'today' : ''}">${d}</div>`;
+    const on = serviceDays[DAY_NAMES[i]];
+    const isSelected = i === selectedIndex;
+    return `<div class="day ${on ? 'on' : ''} ${isSelected ? 'today' : ''}">${d}</div>`;
   }).join('');
 }
 
@@ -26,10 +37,9 @@ function renderLeg(leg) {
     </div>`;
 }
 
-export function renderJourney(j, idx) {
+export function renderJourney(j, idx, dayName = null) {
   const isBest = idx === 0;
   const totalDur = j.totalArr - j.totalDep;
-  
   let legsHtml = '';
   for (let i = 0; i < j.legs.length; i++) {
     legsHtml += renderLeg(j.legs[i]);
@@ -42,10 +52,8 @@ export function renderJourney(j, idx) {
         </div>`;
     }
   }
-  
-  const changeText = j.type === 'direct' ? 'Direct journey' : 
+  const changeText = j.type === 'direct' ? 'Direct journey' :
                      j.type === 'multi' ? '2 changes' : '1 change';
-  
   return `
     <div class="result ${isBest ? 'best' : ''}">
       <div class="meta">
@@ -53,7 +61,7 @@ export function renderJourney(j, idx) {
         ${isBest ? '<span class="badge">Best option</span>' : ''}
       </div>
       <div class="legs">${legsHtml}</div>
-      <div class="days">${renderDays(j.legs[0].serviceDays)}</div>
+      <div class="days">${renderDays(j.legs[0].serviceDays, dayName)}</div>
     </div>`;
 }
 
@@ -95,8 +103,6 @@ export function renderHeader(intent, origin, destination, threshold, timeMins, i
         <span>Leaving after ${minsToTime(threshold)}${dayDisplay} · ${origin} to ${destination}</span>
       </div>`;
   }
-  return html;
-}
   return html;
 }
 

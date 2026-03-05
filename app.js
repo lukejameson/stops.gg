@@ -115,7 +115,7 @@ function executeSearch(origin, destination, originCandidates, destCandidates, th
       return;
     }
 
-    resultsEl.innerHTML = html + journeys.map((j, i) => renderJourney(j, i)).join('');
+    resultsEl.innerHTML = html + journeys.map((j, i) => renderJourney(j, i, dayName)).join('');
   }, 0);
 }
 

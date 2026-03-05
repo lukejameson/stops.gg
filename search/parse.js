@@ -2,35 +2,35 @@ import { getStopVariants } from '../utils/stops.js';
 import { allStopNames } from '../data/loader.js';
 
 const DAY_MAP = {
-  'sunday': 0, 'sun': 0,
-  'monday': 1, 'mon': 1,
-  'tuesday': 2, 'tue': 2, 'tues': 2,
-  'wednesday': 3, 'wed': 3,
-  'thursday': 4, 'thu': 4, 'thurs': 4,
-  'friday': 5, 'fri': 5,
-  'saturday': 6, 'sat': 6,
-  'tomorrow': -1,
-  'today': -2
+  'sunday': 'sunday', 'sun': 'sunday',
+  'monday': 'monday', 'mon': 'monday',
+  'tuesday': 'tuesday', 'tue': 'tuesday', 'tues': 'tuesday',
+  'wednesday': 'wednesday', 'wed': 'wednesday',
+  'thursday': 'thursday', 'thu': 'thursday', 'thurs': 'thursday',
+  'friday': 'friday', 'fri': 'friday',
+  'saturday': 'saturday', 'sat': 'saturday'
 };
 
 export function parseDay(text) {
   const lower = text.toLowerCase();
   
-  // Check for specific days
-  for (const [dayName, dayIndex] of Object.entries(DAY_MAP)) {
-    if (lower.includes(dayName)) {
-      if (dayIndex === -1) {
-        // tomorrow
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        return ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][tomorrow.getDay()];
-      }
-      if (dayIndex === -2) {
-        // today
-        const today = new Date();
-        return ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][today.getDay()];
-      }
-      return dayName;
+  // Check for tomorrow
+  if (/\btomorrow\b/.test(lower)) {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'][tomorrow.getDay()];
+  }
+  
+  // Check for today (return null since we default to today anyway)
+  if (/\btoday\b/.test(lower)) {
+    return null;
+  }
+  
+  // Check for specific days - look for whole words only
+  const words = lower.match(/\b\w+\b/g) || [];
+  for (const word of words) {
+    if (DAY_MAP[word]) {
+      return DAY_MAP[word];
     }
   }
   
