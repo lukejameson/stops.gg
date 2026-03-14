@@ -12,7 +12,7 @@ services:
       - "traefik.http.routers.placeholder.tls.certresolver=letsencrypt"
       - "traefik.http.services.placeholder.loadbalancer.server.port=80"
     networks:
-      - traefik
+      - web
     restart: unless-stopped
 
 networks:
