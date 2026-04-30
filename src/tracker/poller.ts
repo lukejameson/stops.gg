@@ -1,5 +1,6 @@
 import { pool, initDb } from './db.js';
 import type { ApiVehiclePositionsResponse, ApiVehiclePosition } from './types.js';
+import { DateTime } from 'luxon';
 import 'dotenv/config';
 
 const API_BASE = 'https://ticketless-app.api.urbanthings.cloud';
@@ -21,9 +22,8 @@ function parseHHMM(s: string): number {
 }
 
 function guernseyMinutes(): number {
-  const t = new Date().toLocaleTimeString('en-GB', { timeZone: 'Europe/Guernsey', hour12: false });
-  const [h, m] = t.split(':').map(Number);
-  return h * 60 + m;
+  const now = DateTime.now().setZone('Europe/Guernsey');
+  return now.hour * 60 + now.minute;
 }
 
 function isOperatingHours(): boolean {
@@ -92,12 +92,7 @@ function normRouteName(name: string): string {
 }
 
 function toGuernseyHHMM(isoString: string): string {
-  return new Date(isoString).toLocaleTimeString('en-GB', {
-    timeZone: 'Europe/Guernsey',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
+  return DateTime.fromISO(isoString, { zone: 'Europe/Guernsey' }).toFormat('HH:mm');
 }
 
 async function lookupTrip(routeId: number, direction: string, hhMM: string): Promise<number | null> {
@@ -202,18 +197,19 @@ async function pollOnce(): Promise<void> {
       v.tripId ?? null,
       v.destination ?? null,
       currentStopId,
-      v.vehicleId ?? null
+      v.vehicleId ?? null,
+      new Date()
     );
     placeholders.push(
-      `($${pi},$${pi+1},$${pi+2},$${pi+3},$${pi+4},$${pi+5},$${pi+6},$${pi+7},$${pi+8},$${pi+9},$${pi+10},$${pi+11},$${pi+12},$${pi+13},$${pi+14},$${pi+15})`
+      `($${pi},$${pi+1},$${pi+2},$${pi+3},$${pi+4},$${pi+5},$${pi+6},$${pi+7},$${pi+8},$${pi+9},$${pi+10},$${pi+11},$${pi+12},$${pi+13},$${pi+14},$${pi+15},$${pi+16})`
     );
-    pi += 16;
+    pi += 17;
   }
 
   const sql = `
     INSERT INTO vehicle_positions
       (vehicle_ref, route_id, trip_id, lat, lng, bearing, next_stop_id, occupancy, direction, reported,
-       raw_route_name, api_route_id, api_trip_id, destination, current_stop_id, vehicle_id)
+       raw_route_name, api_route_id, api_trip_id, destination, current_stop_id, vehicle_id, ts)
     VALUES ${placeholders.join(',')}
     ON CONFLICT (vehicle_ref, reported) DO NOTHING`;
 
